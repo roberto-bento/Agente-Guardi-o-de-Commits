@@ -1,0 +1,117 @@
+{
+  "name": "Agente Gatekeeper de Commits - GCM",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "github-gatekeeper",
+        "options": {}
+      },
+      "id": "9f5e1a20-4a8f-4b01-9f22-1b8e4e7e0001",
+      "name": "GitHub Webhook (Push Event)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "github-gatekeeper"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/{{ $json.body.repository.owner.name || $json.body.repository.owner.login }}/{{ $json.body.repository.name }}/commits/{{ $json.body.after }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.v3.diff"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-Gatekeeper-Agent"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "9f5e1a20-4a8f-4b01-9f22-1b8e4e7e0002",
+      "name": "Extrair Diff do Commit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.data || $json.body }}",
+        "options": {
+          "systemMessage": "=És um revisor de código automático. Avalia o diff fornecido focado na função `calcularDesconto`. Regra de negócio: O desconto máximo permitido aplicado diretamente no código é de 20% (0.20). Se o valor modificado no código for <= 0.20, responde estritamente 'APROVADO'. Se o valor for > 0.20, responde 'REPROVADO' e aponta a quebra da regra."
+        }
+      },
+      "id": "9f5e1a20-4a8f-4b01-9f22-1b8e4e7e0003",
+      "name": "Agente de IA Gatekeeper",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {}
+      },
+      "id": "9f5e1a20-4a8f-4b01-9f22-1b8e4e7e0004",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [720, 500]
+    }
+  ],
+  "connections": {
+    "GitHub Webhook (Push Event)": {
+      "main": [
+        [
+          {
+            "node": "Extrair Diff do Commit",
+            "type": "main",
+            index: 0
+          }
+        ]
+      ]
+    },
+    "Extrair Diff do Commit": {
+      "main": [
+        [
+          {
+            "node": "Agente de IA Gatekeeper",
+            "type": "main",
+            index: 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agente de IA Gatekeeper",
+            "type": "ai_languageModel",
+            index: 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
